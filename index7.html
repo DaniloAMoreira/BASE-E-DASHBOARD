@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base de Conhecimento e Atendimentos</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- JS Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Plugin for Data Labels -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        :root {
+            --color-bg: #0a0f1f;
+            --color-surface: #10183b;
+            --color-primary: #2a3a90;
+            --color-accent: #3b82f6;
+            --color-text: #e5e7eb;
+            --color-text-muted: #9ca3af;
+            --panel-bg: rgba(16, 24, 59, 0.85);
+            --panel-border: rgba(42, 58, 144, 0.3);
+        }
+
+        body[data-theme="light"] {
+            --color-bg: #f3f4f6;
+            --color-surface: #ffffff;
+            --color-primary: #4f46e5;
+            --color-accent: #3b82f6;
+            --color-text: #111827;
+            --color-text-muted: #6b7280;
+            --panel-bg: rgba(255, 255, 255, 0.85);
+            --panel-border: rgba(209, 213, 219, 0.7);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            overflow-x: hidden;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        #webgl-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid var(--panel-border);
+            box-shadow: 0 8px 32px 0 rgba(10, 15, 31, 0.37);
+            border-radius: 0.75rem;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .dark-panel h3 {
+             color: var(--color-accent);
+        }
+        .dark-panel p {
+             color: var(--color-text);
+        }
+        .dark-panel button {
+             color: var(--color-accent);
+        }
+
+
+        .tab-btn.active {
+            border-color: var(--color-accent);
+            color: var(--color-accent);
+        }
+
+        .subject-list {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.5s ease-in-out;
+        }
+        .subject-list > div {
+            overflow: hidden;
+        }
+        .subject-list.expanded {
+            grid-template-rows: 1fr;
+        }
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--color-bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-primary);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--color-accent);
+        }
+
+        /* Chart Scroll Container */
+        .chart-scroll-container {
+            overflow: auto;
+            min-width: 0;
+        }
+        
+        .chart-inner-container {
+            position: relative;
+            transition: height 0.5s ease-in-out;
+        }
+        
+        .chart-canvas.interactive {
+            cursor: pointer;
+        }
+
+        /* Animations & Effects */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        .glow-on-hover {
+            transition: box-shadow 0.3s ease, transform 0.3s ease;
+        }
+        .glow-on-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 15px 2px var(--color-accent);
+        }
+
+        /* Table styles */
+        .data-table-container {
+            max-height: 500px;
+            overflow: auto;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .data-table th, .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--panel-border);
+        }
+        .data-table th {
+            background-color: var(--color-primary);
+            color: var(--color-text);
+            position: sticky;
+            top: 0;
+        }
+        .data-table tbody tr:hover {
+            background-color: var(--color-surface);
+        }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <canvas id="webgl-bg"></canvas>
+
+    <!-- Main Content -->
+    <div id="main-content" class="relative z-10 animate-fade-in">
+        <div class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+            
+            <div class="mb-6 border-b" style="border-color: var(--color-primary);">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button id="tab-knowledge" class="tab-btn active whitespace-nowrap py-3 px-1 border-b-2 font-medium text-lg text-text-muted hover:text-text transition-colors duration-300">Base de Conhecimento</button>
+                    <button id="tab-dashboard-tickets" class="tab-btn whitespace-nowrap py-3 px-1 border-b-2 border-transparent font-medium text-lg text-text-muted hover:text-text transition-colors duration-300">Dashboard (Atendimentos)</button>
+                </nav>
+            </div>
+
+            <!-- Knowledge Base Tab Content -->
+            <div id="content-knowledge">
+                <header class="mb-6">
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="Pesquisar por categorias e assuntos..." class="w-full bg-surface/80 border border-primary rounded-lg pl-10 pr-4 py-3 text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-accent transition-all duration-300">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg class="w-5 h-5 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div id="header-buttons" class="flex items-center justify-end gap-3 mt-4 relative">
+                        <button id="theme-toggle-btn" title="Alternar Tema" aria-label="Alternar Tema" class="p-2 bg-surface hover:bg-primary border border-primary/50 rounded-full glow-on-hover">
+                            <svg id="theme-icon-sun" class="w-6 h-6 text-text-muted hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                            <svg id="theme-icon-moon" class="w-6 h-6 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                        </button>
+                        <button id="import-btn" title="Importar de arquivo .txt" aria-label="Importar de arquivo .txt" class="p-2 bg-surface hover:bg-primary border border-primary/50 rounded-full glow-on-hover">
+                            <svg class="w-6 h-6 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                        </button>
+                        <input type="file" id="file-input-kb" class="hidden" accept=".txt,.md">
+                    </div>
+                </header>
+                <main id="categories-container" class="space-y-3"></main>
+            </div>
+
+            <!-- Dashboard (Tickets) Tab Content -->
+            <div id="content-dashboard-tickets" class="hidden">
+                <div class="panel dark-panel p-6 rounded-lg mb-6 text-center">
+                    <h2 class="text-2xl font-bold mb-4">Análise de Atendimentos</h2>
+                    <button id="load-tickets-btn" class="bg-accent hover:opacity-90 text-white font-bold py-2 px-6 rounded-lg glow-on-hover">Carregar Dados dos Atendimentos (.xlsx)</button>
+                    <input type="file" id="file-input-tickets" class="hidden" accept=".xlsx">
+                </div>
+
+                <div id="tickets-dashboard-content" class="hidden animate-fade-in space-y-6">
+                    <!-- Filter Status -->
+                    <div id="filter-status-container"></div>
+                    
+                    <!-- KPIs -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="panel dark-panel p-6 rounded-lg">
+                            <h3 class="text-lg font-semibold mb-2">Tickets Exibidos</h3>
+                            <p id="total-tickets" class="text-4xl font-bold">0</p>
+                        </div>
+                        <div class="panel dark-panel p-6 rounded-lg">
+                            <h3 class="text-lg font-semibold mb-2">Responsáveis</h3>
+                            <div id="agents-list" class="mt-2 text-sm space-y-1 max-h-32 overflow-y-auto"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Charts -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="panel dark-panel p-6 rounded-lg flex flex-col">
+                            <h3 class="text-xl font-semibold mb-4">Distribuição por Tipo de Chamado</h3>
+                            <div class="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                <div class="relative h-full min-h-[300px]">
+                                    <canvas id="ticket-types-chart" class="chart-canvas interactive"></canvas>
+                                </div>
+                                <div id="ticket-types-legend" class="text-sm self-stretch flex items-center justify-center"></div>
+                            </div>
+                        </div>
+                         <div class="panel dark-panel p-6 rounded-lg flex flex-col">
+                            <h3 class="text-xl font-semibold mb-4">Atendimentos por Categoria de Assunto</h3>
+                            <div class="flex-grow relative chart-scroll-container">
+                                <div class="chart-inner-container" style="height: 400px;">
+                                    <canvas id="ticket-categories-chart" class="chart-canvas"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                         <div class="panel dark-panel p-6 rounded-lg flex flex-col lg:col-span-2">
+                            <h3 class="text-xl font-semibold mb-4">Atendimentos por Assunto Específico</h3>
+                            <div class="flex-grow relative chart-scroll-container">
+                                <div class="chart-inner-container">
+                                    <canvas id="ticket-subjects-chart" class="chart-canvas"></canvas>
+                                </div>
+                            </div>
+                            <div id="subjects-chart-controls" class="pt-4 text-center"></div>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div id="data-table-container" class="panel p-6 rounded-lg">
+                        <h3 class="text-xl font-semibold mb-4">Detalhes dos Tickets</h3>
+                        <div class="data-table-container">
+                            <table class="data-table">
+                                <thead id="data-table-head"></thead>
+                                <tbody id="data-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const App = (() => {
+            Chart.register(ChartDataLabels);
+
+            const state = {
+                categories: [],
+                allTickets: [],
+                activeFilters: {},
+                chartInstances: {},
+                subjectChartExpanded: false,
+            };
+
+            const CONSTANTS = {
+                STORAGE_KEY_KB: 'knowledgeBaseDataV3',
+                STORAGE_KEY_THEME: 'themePreference',
+                FILTER_KEYS: {
+                    TYPE: 'Tipo do chamado (Campo personalizado de ticket)',
+                    CATEGORY: 'Categoria de assunto do ticket',
+                    SUBJECT: 'Assunto do ticket',
+                }
+            };
+            
+            const DOM = {
+                body: document.body,
+                mainContent: document.getElementById('main-content'),
+                tabKnowledge: document.getElementById('tab-knowledge'),
+                tabDashboardTickets: document.getElementById('tab-dashboard-tickets'),
+                contentKnowledge: document.getElementById('content-knowledge'),
+                contentDashboardTickets: document.getElementById('content-dashboard-tickets'),
+                searchInput: document.getElementById('search-input'),
+                categoriesContainer: document.getElementById('categories-container'),
+                importBtn: document.getElementById('import-btn'),
+                fileInputKB: document.getElementById('file-input-kb'),
+                loadTicketsBtn: document.getElementById('load-tickets-btn'),
+                ticketsFileInput: document.getElementById('file-input-tickets'),
+                ticketsDashboardContent: document.getElementById('tickets-dashboard-content'),
+                totalTickets: document.getElementById('total-tickets'),
+                agentsList: document.getElementById('agents-list'),
+                themeToggleBtn: document.getElementById('theme-toggle-btn'),
+                themeIconSun: document.getElementById('theme-icon-sun'),
+                themeIconMoon: document.getElementById('theme-icon-moon'),
+                ticketTypesLegend: document.getElementById('ticket-types-legend'),
+                subjectsChartControls: document.getElementById('subjects-chart-controls'),
+                filterStatusContainer: document.getElementById('filter-status-container'),
+                dataTableContainer: document.getElementById('data-table-container'),
+                dataTableHead: document.getElementById('data-table-head'),
+                dataTableBody: document.getElementById('data-table-body'),
+            };
+
+            const BackgroundFX = (() => {
+                let scene, camera, renderer, stars;
+                const init = () => {
+                    const canvas = document.getElementById('webgl-bg');
+                    scene = new THREE.Scene();
+                    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+                    camera.position.z = 1;
+                    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                    renderer.setClearColor(0x0a0f1f, 1);
+                    const starGeo = new THREE.BufferGeometry();
+                    const starVertices = [];
+                    for (let i = 0; i < 6000; i++) {
+                        starVertices.push((Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000);
+                    }
+                    starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+                    stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xaaaaaa, size: 0.7 }));
+                    scene.add(stars);
+                    window.addEventListener('resize', onWindowResize, false);
+                    animate();
+                };
+                const onWindowResize = () => {
+                    camera.aspect = window.innerWidth / window.innerHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(window.innerWidth, window.innerHeight);
+                };
+                const animate = () => {
+                    stars.rotation.y += 0.0002;
+                    renderer.render(scene, camera);
+                    requestAnimationFrame(animate);
+                };
+                return { init };
+            })();
+
+            const ThemeSwitcher = (() => {
+                const applyTheme = (theme) => {
+                    DOM.body.dataset.theme = theme;
+                    localStorage.setItem(CONSTANTS.STORAGE_KEY_THEME, theme);
+                    DOM.themeIconSun.classList.toggle('hidden', theme === 'dark');
+                    DOM.themeIconMoon.classList.toggle('hidden', theme === 'light');
+                    Dashboard.updateChartColors();
+                };
+
+                const toggleTheme = () => {
+                    const currentTheme = DOM.body.dataset.theme === 'dark' ? 'light' : 'dark';
+                    applyTheme(currentTheme);
+                };
+
+                const init = () => {
+                    const savedTheme = localStorage.getItem(CONSTANTS.STORAGE_KEY_THEME);
+                    const preferredTheme = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+                    applyTheme(savedTheme || preferredTheme);
+                    DOM.themeToggleBtn.addEventListener('click', toggleTheme);
+                };
+                
+                return { init };
+            })();
+
+            const UI = (() => {
+                 const switchTab = (activeTab) => {
+                    const tabs = [ { btn: DOM.tabKnowledge, content: DOM.contentKnowledge, name: 'knowledge' }, { btn: DOM.tabDashboardTickets, content: DOM.contentDashboardTickets, name: 'dashboard-tickets' }];
+                    tabs.forEach(tab => {
+                        const isActive = tab.name === activeTab;
+                        tab.btn.classList.toggle('active', isActive);
+                        tab.content.classList.toggle('hidden', !isActive);
+                    });
+                };
+                const createModal = (config) => {
+                    document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+                    const { title, content, buttons } = config;
+                    const modalOverlay = document.createElement('div');
+                    modalOverlay.className = 'modal-overlay fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 animate-fade-in';
+                    let buttonsHTML = '';
+                    if (buttons) {
+                        buttonsHTML = `<div class="flex justify-end gap-4 mt-6">${buttons.map(btn => `<button class="${btn.classes} font-bold py-2 px-6 rounded-lg glow-on-hover">${btn.text}</button>`).join('')}</div>`;
+                    }
+                    modalOverlay.innerHTML = `<div class="panel text-text p-6 rounded-lg shadow-lg max-w-sm mx-4 w-full modal-container">${title ? `<h3 class="text-lg font-medium mb-4 text-accent">${title}</h3>` : ''}<div class="modal-content">${content}</div>${buttonsHTML}</div>`;
+                    document.body.appendChild(modalOverlay);
+                    if (buttons) {
+                        modalOverlay.querySelectorAll('button').forEach((button, index) => {
+                            button.addEventListener('click', () => {
+                                buttons[index].onClick?.();
+                                if (buttons[index].closes !== false) modalOverlay.remove();
+                            });
+                        });
+                    }
+                    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
+                };
+                const showInfoModal = (message) => createModal({ content: `<p>${message}</p>`, buttons: [{ text: 'OK', classes: 'bg-accent hover:opacity-90 text-white' }] });
+                return { switchTab, showInfoModal };
+            })();
+
+            const KnowledgeBase = (() => {
+                const loadData = () => { state.categories = JSON.parse(localStorage.getItem(CONSTANTS.STORAGE_KEY_KB) || '[]'); };
+                const saveData = () => localStorage.setItem(CONSTANTS.STORAGE_KEY_KB, JSON.stringify(state.categories));
+                const render = () => {
+                    const dataToRender = filterData();
+                    DOM.categoriesContainer.innerHTML = '';
+                    if (dataToRender.length === 0) {
+                        const searchTerm = DOM.searchInput.value.trim();
+                        DOM.categoriesContainer.innerHTML = `<div class="text-center text-text-muted py-10">${searchTerm ? `Nenhuma categoria encontrada para "${searchTerm}".` : "Nenhuma categoria. Use o botão 'Importar' para carregar dados."}</div>`;
+                        return;
+                    }
+                    const fragment = document.createDocumentFragment();
+                    dataToRender.forEach(category => fragment.appendChild(createCategoryElement(category)));
+                    DOM.categoriesContainer.appendChild(fragment);
+                };
+                const filterData = () => {
+                    const searchTerm = DOM.searchInput.value.toLowerCase().trim();
+                    if (!searchTerm) return state.categories;
+                    return state.categories.filter(cat => cat.name.toLowerCase().includes(searchTerm) || cat.subjects.some(sub => sub.toLowerCase().includes(searchTerm)));
+                };
+                const createCategoryElement = (category) => {
+                    const element = document.createElement('div');
+                    element.className = 'panel rounded-lg';
+                    element.dataset.categoryId = category.id;
+                    const isExpanded = category.expanded || false;
+                    const searchTerm = DOM.searchInput.value.toLowerCase().trim();
+                    const categoryNameMatches = category.name.toLowerCase().includes(searchTerm);
+                    const subjectsToDisplay = (searchTerm && !categoryNameMatches) ? category.subjects.filter(s => s.toLowerCase().includes(searchTerm)) : category.subjects;
+                    const subjectsHTML = subjectsToDisplay.length > 0 ? subjectsToDisplay.map(subject => `<li class="group flex items-center justify-between text-text ml-2 p-1 rounded-md"><span class="truncate pr-2">${subject}</span></li>`).join('') : '<li class="text-text-muted text-sm ml-2">Nenhum assunto.</li>';
+                    element.innerHTML = `<div class="group flex items-center justify-between p-4 cursor-pointer category-header"><h3 class="text-lg font-semibold truncate pr-2 text-accent">${category.name}</h3><div class="flex items-center gap-3"><svg class="w-6 h-6 text-text-muted transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></div></div><div class="subject-list ${isExpanded ? 'expanded' : ''}"><div><div class="p-4 border-t" style="border-color: rgba(42, 58, 144, 0.3);"><ul class="space-y-1 mb-4">${subjectsHTML}</ul></div></div></div>`;
+                    return element;
+                };
+                const toggleCategory = (categoryId) => {
+                    const category = state.categories.find(c => c.id === categoryId);
+                    if (category) {
+                        category.expanded = !category.expanded;
+                        saveData();
+                        const categoryElement = DOM.categoriesContainer.querySelector(`[data-category-id='${categoryId}']`);
+                        if (categoryElement) {
+                            categoryElement.querySelector('.subject-list').classList.toggle('expanded');
+                            categoryElement.querySelector('.category-header svg:last-of-type').classList.toggle('rotate-180');
+                        }
+                    }
+                };
+                const handleContainerInteraction = (e) => {
+                    const categoryElement = e.target.closest('.panel[data-category-id]');
+                    if (categoryElement && e.target.closest('.category-header')) {
+                        toggleCategory(Number(categoryElement.dataset.categoryId));
+                    }
+                };
+                return { loadData, render, handleContainerInteraction };
+            })();
+            
+            const DataIO = (() => {
+                const importAndMerge = (text) => {
+                    const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+                    if (lines.length === 0) return 0;
+                    const dataToImport = {};
+                    let importedCount = 0;
+                    const startIndex = lines[0].toLowerCase().includes('categorias de assuntos\tassunto') ? 1 : 0;
+                    for (let i = startIndex; i < lines.length; i++) {
+                        const parts = lines[i].split('\t');
+                        if (parts.length < 2) continue;
+                        const categoryName = parts[0].trim();
+                        const subjectName = parts[1].trim();
+                        if (!dataToImport[categoryName]) dataToImport[categoryName] = new Set();
+                        if (subjectName) dataToImport[categoryName].add(subjectName);
+                    }
+                    for (const categoryName in dataToImport) {
+                        importedCount++;
+                        let existingCategory = state.categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+                        if (existingCategory) {
+                            dataToImport[categoryName].forEach(subject => {
+                                if (!existingCategory.subjects.some(s => s.toLowerCase() === subject.toLowerCase())) existingCategory.subjects.push(subject);
+                            });
+                        } else {
+                            state.categories.unshift({ id: Date.now() + Math.random(), name: categoryName, subjects: Array.from(dataToImport[categoryName]), expanded: false });
+                        }
+                    }
+                    if (importedCount > 0) KnowledgeBase.saveData();
+                    return importedCount;
+                };
+                const processFileForImport = (file) => {
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const importedCount = importAndMerge(event.target.result);
+                        UI.showInfoModal(importedCount > 0 ? `${importedCount} categorias importadas/atualizadas!` : 'Nenhuma categoria encontrada no arquivo.');
+                        KnowledgeBase.render();
+                    };
+                    reader.readAsText(file);
+                };
+                return { processFileForImport };
+            })();
+
+            const Dashboard = (() => {
+
+                const hexToRgba = (hex, alpha = 1) => {
+                    if (!hex || typeof hex !== 'string') return `rgba(200,200,200,${alpha})`;
+                    const [r, g, b] = hex.match(/\w\w/g).map(x => parseInt(x, 16));
+                    return `rgba(${r},${g},${b},${alpha})`;
+                };
+
+                const applyFiltersAndRedraw = () => {
+                    let fullyFilteredTickets = [...state.allTickets];
+                    for (const key in state.activeFilters) {
+                        const value = state.activeFilters[key];
+                        if (value) {
+                            fullyFilteredTickets = fullyFilteredTickets.filter(ticket => ticket[key] === value);
+                        }
+                    }
+                    
+                    let pieChartData = [...state.allTickets];
+                    for (const key in state.activeFilters) {
+                        if (key === CONSTANTS.FILTER_KEYS.TYPE) continue;
+                        const value = state.activeFilters[key];
+                        if (value) {
+                            pieChartData = pieChartData.filter(ticket => ticket[key] === value);
+                        }
+                    }
+
+                    updateDashboardDisplay(fullyFilteredTickets, pieChartData);
+                };
+                
+                const handleChartClick = (e, chart, filterKey) => {
+                    const points = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, true);
+                    const label = points.length ? chart.data.labels[points[0].index] : null;
+
+                    if (!label) {
+                        if (state.activeFilters[filterKey]) {
+                           delete state.activeFilters[filterKey];
+                           applyFiltersAndRedraw();
+                        }
+                        return;
+                    }
+
+                    if (state.activeFilters[filterKey] === label) {
+                        delete state.activeFilters[filterKey];
+                    } else {
+                        state.activeFilters[filterKey] = label;
+                    }
+                    
+                    applyFiltersAndRedraw();
+                };
+                
+                const clearFilters = () => {
+                    state.activeFilters = {};
+                    applyFiltersAndRedraw();
+                };
+
+                const renderFilterStatus = () => {
+                    const filters = Object.entries(state.activeFilters);
+                    if (filters.length === 0) {
+                        DOM.filterStatusContainer.innerHTML = '';
+                        return;
+                    }
+
+                    const filterPills = filters.map(([key, value]) => `
+                        <span class="inline-flex items-center bg-primary/50 text-text text-sm font-medium px-3 py-1 rounded-full">
+                           ${key.split('(')[0].trim()}: ${value}
+                        </span>
+                    `).join('');
+
+                    DOM.filterStatusContainer.innerHTML = `
+                        <div class="panel p-4 mb-6 flex items-center justify-between flex-wrap gap-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-semibold">Filtros Ativos:</span>
+                                ${filterPills}
+                            </div>
+                            <button id="clear-filters-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-1 px-4 rounded-lg text-sm">Limpar Filtros</button>
+                        </div>
+                    `;
+                    document.getElementById('clear-filters-btn').addEventListener('click', clearFilters);
+                };
+
+                const renderDataTable = (data) => {
+                    const columns = ['Número do ticket', CONSTANTS.FILTER_KEYS.TYPE, CONSTANTS.FILTER_KEYS.CATEGORY, CONSTANTS.FILTER_KEYS.SUBJECT, 'Responsável do ticket', 'Data de criação do ticket'];
+                    
+                    DOM.dataTableHead.innerHTML = `<tr>${columns.map(c => `<th>${c}</th>`).join('')}</tr>`;
+
+                    if (data.length === 0) {
+                        DOM.dataTableBody.innerHTML = `<tr><td colspan="${columns.length}" class="text-center py-8 text-text-muted">Nenhum ticket encontrado com os filtros atuais.</td></tr>`;
+                        return;
+                    }
+
+                    DOM.dataTableBody.innerHTML = data.map(ticket => `
+                        <tr>
+                            ${columns.map(col => `<td class="truncate" style="max-width: 200px;" title="${ticket[col] || ''}">${ticket[col] || 'N/A'}</td>`).join('')}
+                        </tr>
+                    `).join('');
+                };
+
+                const updateDashboardDisplay = (filteredData, pieData) => {
+                    DOM.totalTickets.textContent = `${filteredData.length} de ${state.allTickets.length}`;
+                    const uniqueAgents = new Set(filteredData.map(item => item['Responsável do ticket']));
+                    DOM.agentsList.innerHTML = Array.from(uniqueAgents).map(agent => `<p class="truncate p-1 bg-primary/20 rounded">${agent || 'Não atribuído'}</p>`).join('') || '<p class="text-text-muted">Nenhum responsável.</p>';
+
+                    updateChart(state.chartInstances.ticketTypesChart, pieData, CONSTANTS.FILTER_KEYS.TYPE);
+                    updateChart(state.chartInstances.ticketCategoriesChart, filteredData, CONSTANTS.FILTER_KEYS.CATEGORY);
+                    updateChart(state.chartInstances.ticketSubjectsChart, filteredData, CONSTANTS.FILTER_KEYS.SUBJECT);
+
+                    renderDataTable(filteredData);
+                    renderFilterStatus();
+                    updateChartColors();
+                };
+
+                const updateChart = (chart, data, key) => {
+                    if (!chart) return;
+                    
+                    const counts = data.reduce((acc, item) => {
+                        const value = item[key];
+                        if (value) acc[value] = (acc[value] || 0) + 1;
+                        return acc;
+                    }, {});
+
+                    const sortedData = Object.entries(counts).sort(([, a], [, b]) => b - a);
+
+                    let dataToShow = sortedData;
+                    const isSubjectsChart = chart.canvas.id === 'ticket-subjects-chart';
+                    
+                    if (isSubjectsChart && sortedData.length > 10) {
+                        dataToShow = state.subjectChartExpanded ? sortedData : sortedData.slice(0, 10);
+                        updateSubjectChartButton(sortedData.length);
+                    } else if (isSubjectsChart) {
+                        DOM.subjectsChartControls.innerHTML = '';
+                    }
+
+                    chart.data.labels = dataToShow.map(([label]) => label);
+                    chart.data.datasets[0].data = dataToShow.map(([, count]) => count);
+                    
+                    const container = chart.canvas.parentElement;
+                    if (chart.config.type === 'pie') {
+                        const { originalColors } = chart.data.datasets[0];
+                        const highlightedLabel = state.activeFilters[CONSTANTS.FILTER_KEYS.TYPE];
+                        const highlightedIndex = highlightedLabel ? chart.data.labels.indexOf(highlightedLabel) : -1;
+
+                        chart.data.datasets[0].offset = chart.data.labels.map((_, index) => index === highlightedIndex ? 20 : 0);
+                        chart.data.datasets[0].backgroundColor = originalColors.map((color, index) => {
+                            return (highlightedIndex !== -1 && index !== highlightedIndex) ? hexToRgba(color, 0.3) : color;
+                        });
+                        generateHTMLLegend(chart, data);
+
+                    } else if (chart.config.options.indexAxis === 'x') {
+                        container.style.width = `${Math.max(400, dataToShow.length * 55)}px`;
+                    } else if (chart.config.options.indexAxis === 'y') {
+                        container.style.height = `${dataToShow.length * 40}px`;
+                    }
+                    
+                    chart.resize(); // Force chart to re-evaluate its container size
+                    chart.update();
+                };
+
+                const generateHTMLLegend = (chart, data) => {
+                    const legendContainer = DOM.ticketTypesLegend;
+                    legendContainer.innerHTML = ''; // Clear previous content
+
+                    const highlightedLabel = state.activeFilters[CONSTANTS.FILTER_KEYS.TYPE];
+                    const totalForPercentage = state.allTickets.length;
+
+                    if (highlightedLabel) {
+                        const highlightedIndex = chart.data.labels.indexOf(highlightedLabel);
+                        if (highlightedIndex > -1) {
+                            const totalCountForLabel = state.allTickets.filter(t => t[CONSTANTS.FILTER_KEYS.TYPE] === highlightedLabel).length;
+                            const percentage = totalForPercentage > 0 ? ((totalCountForLabel / totalForPercentage) * 100).toFixed(1) : 0;
+                            const color = chart.data.datasets[0].originalColors[highlightedIndex];
+                            
+                            const detailCard = document.createElement('div');
+                            detailCard.className = 'flex flex-col items-center justify-center h-full p-4 bg-surface/50 rounded-lg animate-fade-in w-full';
+                            detailCard.innerHTML = `
+                                <div class="flex items-center gap-3">
+                                    <span class="w-5 h-5 rounded" style="background-color: ${color};"></span>
+                                    <span class="font-bold text-xl text-text text-center">${highlightedLabel}</span>
+                                </div>
+                                <div class="mt-6 text-center">
+                                    <p class="text-4xl font-bold text-accent">${totalCountForLabel}</p>
+                                    <p class="text-base text-text-muted">tickets</p>
+                                </div>
+                                <div class="mt-4 text-center">
+                                    <p class="text-4xl font-bold text-accent">${percentage}%</p>
+                                    <p class="text-base text-text-muted">do total</p>
+                                </div>`;
+                            legendContainer.appendChild(detailCard);
+                        }
+                    } else {
+                         const allTypesCounts = data.reduce((acc, item) => {
+                            const type = item[CONSTANTS.FILTER_KEYS.TYPE];
+                            if (type) acc[type] = (acc[type] || 0) + 1;
+                            return acc;
+                        }, {});
+
+                        const legendItems = chart.data.labels.map((label, index) => ({ 
+                            text: label, 
+                            fillStyle: chart.data.datasets[0].originalColors[index], 
+                            count: allTypesCounts[label] || 0
+                        }));
+                        
+                        const legendList = document.createElement('ul');
+                        legendList.className = 'space-y-2 animate-fade-in h-full overflow-y-auto max-h-[350px]';
+                        legendList.innerHTML = legendItems.sort((a,b) => b.count - a.count).map(item => `
+                            <li class="flex items-center">
+                                <span class="font-bold text-text w-8 text-right mr-3">${item.count}</span>
+                                <span class="w-4 h-4 rounded mr-3" style="background-color: ${item.fillStyle}"></span>
+                                <span class="text-text-muted truncate">${item.text}</span>
+                            </li>`).join('');
+                        legendContainer.appendChild(legendList);
+                    }
+                };
+
+                const updateChartColors = () => {
+                    const mutedColor = getComputedStyle(document.body).getPropertyValue('--color-text-muted').trim();
+                    const textColor = getComputedStyle(document.body).getPropertyValue('--color-text').trim();
+                    for (const chartId in state.chartInstances) {
+                        const chart = state.chartInstances[chartId];
+                        if (chart.config.type === 'bar') {
+                            chart.options.scales.x.ticks.color = mutedColor;
+                            chart.options.scales.y.ticks.color = mutedColor;
+                            chart.options.plugins.datalabels.color = textColor;
+                        }
+                        chart.update('none');
+                    }
+                };
+                
+                const toggleSubjectChartExpansion = () => {
+                    state.subjectChartExpanded = !state.subjectChartExpanded;
+                    applyFiltersAndRedraw();
+                };
+
+                const updateSubjectChartButton = (totalItems) => {
+                    if (totalItems <= 10) { DOM.subjectsChartControls.innerHTML = ''; return; }
+                    const buttonText = state.subjectChartExpanded ? 'Ver menos' : `Ver mais (${totalItems - 10} ocultos)`;
+                    DOM.subjectsChartControls.innerHTML = `<button id="toggle-subjects-chart" class="text-accent hover:underline font-medium">${buttonText}</button>`;
+                    document.getElementById('toggle-subjects-chart').addEventListener('click', toggleSubjectChartExpansion);
+                };
+
+                const createCharts = () => {
+                    Object.values(state.chartInstances).forEach(instance => instance?.destroy());
+                    
+                    const backgroundColors = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#ef4444', '#6b7280', '#f97316', '#6366f1', '#d946ef'];
+                    
+                    const baseBarOptions = (indexAxis = 'x') => ({
+                        indexAxis,
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        layout: { padding: { left: indexAxis === 'y' ? 10 : 5, bottom: indexAxis === 'x' ? 80 : 10, right: 10 } },
+                        plugins: { legend: { display: false }, tooltip: { enabled: false }, datalabels: { display: true, anchor: indexAxis === 'y' ? 'end' : 'end', align: indexAxis === 'y' ? 'end' : 'top', padding: { right: indexAxis === 'y' ? 6 : 0 }, color: 'var(--color-text)', font: { weight: 'bold', size: 12 }, formatter: (v) => v > 0 ? v : null } },
+                        scales: { x: { ticks: { color: 'var(--color-text-muted)', autoSkip: false, maxRotation: 90, minRotation: 45 }, grid: { color: 'rgba(255,255,255,0.05)' }, beginAtZero: true }, y: { ticks: { color: 'var(--color-text-muted)' }, grid: { color: 'rgba(255,255,255,0.1)' }, beginAtZero: true } }
+                    });
+                    const pieOptions = { responsive: true, maintainAspectRatio: false, events: ['click'], plugins: { legend: { display: false }, tooltip: { enabled: false }, datalabels: { formatter: (v, ctx) => { let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0); return sum > 0 ? (v * 100 / sum).toFixed(1) + "%" : '0%'; }, color: '#fff', font: { weight: 'bold' } } } };
+
+                    const pieData = { datasets: [{ data: [], backgroundColor: backgroundColors, originalColors: backgroundColors }] };
+                    const barData = { datasets: [{ data: [], backgroundColor: backgroundColors }] };
+
+                    state.chartInstances.ticketTypesChart = new Chart(document.getElementById('ticket-types-chart'), { type: 'pie', data: pieData, options: { ...pieOptions, onClick: (e) => handleChartClick(e, state.chartInstances.ticketTypesChart, CONSTANTS.FILTER_KEYS.TYPE) } });
+                    state.chartInstances.ticketCategoriesChart = new Chart(document.getElementById('ticket-categories-chart'), { type: 'bar', data: barData, options: { ...baseBarOptions('x') } });
+                    state.chartInstances.ticketSubjectsChart = new Chart(document.getElementById('ticket-subjects-chart'), { type: 'bar', data: barData, options: { ...baseBarOptions('y') } });
+                    
+                    DOM.ticketsDashboardContent.classList.remove('hidden');
+                };
+
+                const processFileForDashboard = (file) => {
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        try {
+                            const workbook = XLSX.read(new Uint8Array(event.target.result), { type: 'array' });
+                            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                            state.allTickets = XLSX.utils.sheet_to_json(worksheet);
+                            
+                            if (state.allTickets.length === 0) {
+                                UI.showInfoModal("O arquivo Excel parece estar vazio ou não contém dados reconhecíveis.");
+                                return;
+                            }
+                            
+                            createCharts();
+                            clearFilters();
+
+                        } catch (error) {
+                            console.error("Erro ao processar o arquivo XLSX:", error);
+                            UI.showInfoModal("Ocorreu um erro ao ler o arquivo. Verifique se o formato está correto.");
+                        }
+                    };
+                    reader.onerror = () => UI.showInfoModal("Não foi possível ler o arquivo selecionado.");
+                    reader.readAsArrayBuffer(file);
+                };
+
+                return { processFileForDashboard, updateChartColors };
+            })();
+
+            const bindMainAppEvents = () => {
+                DOM.tabKnowledge.addEventListener('click', () => UI.switchTab('knowledge'));
+                DOM.tabDashboardTickets.addEventListener('click', () => UI.switchTab('dashboard-tickets'));
+                DOM.searchInput.addEventListener('input', () => KnowledgeBase.render());
+                DOM.categoriesContainer.addEventListener('click', KnowledgeBase.handleContainerInteraction);
+                DOM.importBtn.addEventListener('click', () => DOM.fileInputKB.click());
+                DOM.fileInputKB.addEventListener('change', (e) => {
+                    DataIO.processFileForImport(e.target.files[0]);
+                    e.target.value = '';
+                });
+                DOM.loadTicketsBtn.addEventListener('click', () => DOM.ticketsFileInput.click());
+                DOM.ticketsFileInput.addEventListener('change', (e) => {
+                    Dashboard.processFileForDashboard(e.target.files[0]);
+                    e.target.value = '';
+                });
+            };
+
+            const init = () => {
+                BackgroundFX.init();
+                ThemeSwitcher.init();
+                bindMainAppEvents();
+                KnowledgeBase.loadData();
+                KnowledgeBase.render();
+            };
+
+            return { init };
+        })();
+
+        App.init();
+    });
+    </script>
+</body>
+</html>
+
