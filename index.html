@@ -4,13 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Base de Conhecimento e Atendimentos</title>
-    <link rel="icon" type="image/png" href="magic (1).png"> <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- JS Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Plugin for Data Labels -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
@@ -167,10 +171,11 @@
         }
     </style>
 </head>
-<body>
+<body data-theme="dark">
 
     <canvas id="webgl-bg"></canvas>
 
+    <!-- Main Content -->
     <div id="main-content" class="relative z-10 animate-fade-in">
         <div class="container mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
             
@@ -181,6 +186,7 @@
                 </nav>
             </div>
 
+            <!-- Knowledge Base Tab Content -->
             <div id="content-knowledge">
                 <header class="mb-6">
                     <div class="relative">
@@ -203,6 +209,7 @@
                 <main id="categories-container" class="space-y-3"></main>
             </div>
 
+            <!-- Dashboard (Tickets) Tab Content -->
             <div id="content-dashboard-tickets" class="hidden">
                 <div class="panel dark-panel p-6 rounded-lg mb-6 text-center">
                     <h2 class="text-2xl font-bold mb-4">Análise de Atendimentos</h2>
@@ -211,8 +218,10 @@
                 </div>
 
                 <div id="tickets-dashboard-content" class="hidden animate-fade-in space-y-6">
+                    <!-- Filter Status -->
                     <div id="filter-status-container"></div>
                     
+                    <!-- KPIs -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="panel dark-panel p-6 rounded-lg">
                             <h3 class="text-lg font-semibold mb-2">Tickets Exibidos</h3>
@@ -224,6 +233,7 @@
                         </div>
                     </div>
                     
+                    <!-- Charts -->
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div class="panel dark-panel p-6 rounded-lg flex flex-col">
                             <h3 class="text-xl font-semibold mb-4">Distribuição por Tipo de Chamado</h3>
@@ -253,6 +263,7 @@
                         </div>
                     </div>
 
+                    <!-- Data Table -->
                     <div id="data-table-container" class="panel p-6 rounded-lg">
                         <h3 class="text-xl font-semibold mb-4">Detalhes dos Tickets</h3>
                         <div class="data-table-container">
@@ -377,36 +388,36 @@
 
             const UI = (() => {
                  const switchTab = (activeTab) => {
-                     const tabs = [ { btn: DOM.tabKnowledge, content: DOM.contentKnowledge, name: 'knowledge' }, { btn: DOM.tabDashboardTickets, content: DOM.contentDashboardTickets, name: 'dashboard-tickets' }];
-                     tabs.forEach(tab => {
-                         const isActive = tab.name === activeTab;
-                         tab.btn.classList.toggle('active', isActive);
-                         tab.content.classList.toggle('hidden', !isActive);
-                     });
-                 };
-                 const createModal = (config) => {
-                     document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
-                     const { title, content, buttons } = config;
-                     const modalOverlay = document.createElement('div');
-                     modalOverlay.className = 'modal-overlay fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 animate-fade-in';
-                     let buttonsHTML = '';
-                     if (buttons) {
-                         buttonsHTML = `<div class="flex justify-end gap-4 mt-6">${buttons.map(btn => `<button class="${btn.classes} font-bold py-2 px-6 rounded-lg glow-on-hover">${btn.text}</button>`).join('')}</div>`;
-                     }
-                     modalOverlay.innerHTML = `<div class="panel text-text p-6 rounded-lg shadow-lg max-w-sm mx-4 w-full modal-container">${title ? `<h3 class="text-lg font-medium mb-4 text-accent">${title}</h3>` : ''}<div class="modal-content">${content}</div>${buttonsHTML}</div>`;
-                     document.body.appendChild(modalOverlay);
-                     if (buttons) {
-                         modalOverlay.querySelectorAll('button').forEach((button, index) => {
-                             button.addEventListener('click', () => {
-                                 buttons[index].onClick?.();
-                                 if (buttons[index].closes !== false) modalOverlay.remove();
-                             });
-                         });
-                     }
-                     modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
-                 };
-                 const showInfoModal = (message) => createModal({ content: `<p>${message}</p>`, buttons: [{ text: 'OK', classes: 'bg-accent hover:opacity-90 text-white' }] });
-                 return { switchTab, showInfoModal };
+                    const tabs = [ { btn: DOM.tabKnowledge, content: DOM.contentKnowledge, name: 'knowledge' }, { btn: DOM.tabDashboardTickets, content: DOM.contentDashboardTickets, name: 'dashboard-tickets' }];
+                    tabs.forEach(tab => {
+                        const isActive = tab.name === activeTab;
+                        tab.btn.classList.toggle('active', isActive);
+                        tab.content.classList.toggle('hidden', !isActive);
+                    });
+                };
+                const createModal = (config) => {
+                    document.querySelectorAll('.modal-overlay').forEach(m => m.remove());
+                    const { title, content, buttons } = config;
+                    const modalOverlay = document.createElement('div');
+                    modalOverlay.className = 'modal-overlay fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 animate-fade-in';
+                    let buttonsHTML = '';
+                    if (buttons) {
+                        buttonsHTML = `<div class="flex justify-end gap-4 mt-6">${buttons.map(btn => `<button class="${btn.classes} font-bold py-2 px-6 rounded-lg glow-on-hover">${btn.text}</button>`).join('')}</div>`;
+                    }
+                    modalOverlay.innerHTML = `<div class="panel text-text p-6 rounded-lg shadow-lg max-w-sm mx-4 w-full modal-container">${title ? `<h3 class="text-lg font-medium mb-4 text-accent">${title}</h3>` : ''}<div class="modal-content">${content}</div>${buttonsHTML}</div>`;
+                    document.body.appendChild(modalOverlay);
+                    if (buttons) {
+                        modalOverlay.querySelectorAll('button').forEach((button, index) => {
+                            button.addEventListener('click', () => {
+                                buttons[index].onClick?.();
+                                if (buttons[index].closes !== false) modalOverlay.remove();
+                            });
+                        });
+                    }
+                    modalOverlay.addEventListener('click', (e) => { if (e.target === modalOverlay) modalOverlay.remove(); });
+                };
+                const showInfoModal = (message) => createModal({ content: `<p>${message}</p>`, buttons: [{ text: 'OK', classes: 'bg-accent hover:opacity-90 text-white' }] });
+                return { switchTab, showInfoModal };
             })();
 
             const KnowledgeBase = (() => {
@@ -694,26 +705,26 @@
                         }
                     } else {
                          const allTypesCounts = data.reduce((acc, item) => {
-                             const type = item[CONSTANTS.FILTER_KEYS.TYPE];
-                             if (type) acc[type] = (acc[type] || 0) + 1;
-                             return acc;
-                         }, {});
+                            const type = item[CONSTANTS.FILTER_KEYS.TYPE];
+                            if (type) acc[type] = (acc[type] || 0) + 1;
+                            return acc;
+                        }, {});
 
-                         const legendItems = chart.data.labels.map((label, index) => ({ 
-                             text: label, 
-                             fillStyle: chart.data.datasets[0].originalColors[index], 
-                             count: allTypesCounts[label] || 0
-                         }));
-                         
-                         const legendList = document.createElement('ul');
-                         legendList.className = 'space-y-2 animate-fade-in h-full overflow-y-auto max-h-[350px]';
-                         legendList.innerHTML = legendItems.sort((a,b) => b.count - a.count).map(item => `
-                             <li class="flex items-center">
-                                 <span class="font-bold text-text w-8 text-right mr-3">${item.count}</span>
-                                 <span class="w-4 h-4 rounded mr-3" style="background-color: ${item.fillStyle}"></span>
-                                 <span class="text-text-muted truncate">${item.text}</span>
-                             </li>`).join('');
-                         legendContainer.appendChild(legendList);
+                        const legendItems = chart.data.labels.map((label, index) => ({ 
+                            text: label, 
+                            fillStyle: chart.data.datasets[0].originalColors[index], 
+                            count: allTypesCounts[label] || 0
+                        }));
+                        
+                        const legendList = document.createElement('ul');
+                        legendList.className = 'space-y-2 animate-fade-in h-full overflow-y-auto max-h-[350px]';
+                        legendList.innerHTML = legendItems.sort((a,b) => b.count - a.count).map(item => `
+                            <li class="flex items-center">
+                                <span class="font-bold text-text w-8 text-right mr-3">${item.count}</span>
+                                <span class="w-4 h-4 rounded mr-3" style="background-color: ${item.fillStyle}"></span>
+                                <span class="text-text-muted truncate">${item.text}</span>
+                            </li>`).join('');
+                        legendContainer.appendChild(legendList);
                     }
                 };
 
